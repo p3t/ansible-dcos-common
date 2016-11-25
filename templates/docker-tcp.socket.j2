@@ -1,0 +1,13 @@
+[Unit]
+Description=Docker Socket for the API
+PartOf=docker.service
+
+[Socket]
+ListenStream=2375
+Service=docker.service
+BindIPv6Only=both
+SocketUser=root
+SocketGroup=docker
+
+[Install]
+WantedBy=sockets.target

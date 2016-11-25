@@ -33,6 +33,9 @@
 - name: Load kernel module
   modprobe: name=overlay state=present
 
+- name: Configure proxy for yum if needed
+  lineinfile: dest=/etc/yum.conf regexp="^proxy" line="proxy={{ environment.http_proxy }}" state=present create=yes
+
 - name: Configure yum to use the Docker yum repo
   template: src=docker.repo.j2 dest=/etc/yum.repos.d/docker.repo
 
@@ -42,8 +45,22 @@
 - name: Configure systemd to run the Docker Daemon with OverlayFS
   template: src=override.conf.j2 dest=/etc/systemd/system/docker.service.d/override.conf
 
+- name: Configure docker proxy if needed
+  template: src=http-proxy.conf.j2 dest=/etc/systemd/system/docker.service.d/http-proxy.conf
+
 - name: Install the Docker engine
-  yum: name=docker-engine-1.11.2 state=latest
+  yum: name=docker-engine state=latest
+
+- name: TCP-socket for docker
+  template: src=docker-tcp.socket.j2 dest=/etc/systemd/system/docker-tcp.socket
+
+- systemd: state=restarted daemon_reload=yes name=docker
+
+- systemd: state=restarted daemon_reload=yes name=docker-tcp.socket
 
 - name: Enable and start the Docker engine
   service: name=docker  enabled=yes state=started
+
+- name: Enable and start the Docker socket
+  service: name=docker-tcp.socket  enabled=yes state=started
+
