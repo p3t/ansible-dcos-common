@@ -34,7 +34,7 @@
   modprobe: name=overlay state=present
 
 - name: Configure proxy for yum if needed
-  lineinfile: dest=/etc/yum.conf regexp="^proxy" line="proxy={{ environment.http_proxy }}" state=present create=yes
+  lineinfile: dest=/etc/yum.conf regexp="^proxy" line="proxy={{ env.http_proxy }}" state="present" create=yes
 
 - name: Configure yum to use the Docker yum repo
   template: src=docker.repo.j2 dest=/etc/yum.repos.d/docker.repo
@@ -51,16 +51,36 @@
 - name: Install the Docker engine
   yum: name=docker-engine state=latest
 
-- name: TCP-socket for docker
-  template: src=docker-tcp.socket.j2 dest=/etc/systemd/system/docker-tcp.socket
+- name: stop docker
+  systemd: state=stopped name=docker
+
+# check if /var/lib/docker is a symlink
+- stat: path=/var/lib/docker 
+  register: var_lib_docker
+
+- name: move /var/lib/docker to /pkg/docker
+  command: "{{ item }}" 
+  with_items: 
+  - cp -ra /var/lib/docker /pkg
+  - rm -rf /var/lib/docker
+  - ln -s /pkg/docker /var/lib/docker
+  when: var_lib_docker.stat.isdir is defined and var_lib_docker.stat.isdir
+
+#  synchronize: mode=pull src=/var/lib/docker dest=/pkg/docker recursive=true
+#  when: var_lib_docker.stat.isdir is defined and var_lib_docker.stat.isdir
+
+#- name: remove the folder (only if it is a folder)
+#  file: path=/var/lib/docker state=absent
+#  when: sites_available.stat.isdir is defined and sites_available.stat.isdir
+
+#- name: setup link /var/lib/docker -> /pkg/docker
+#  file: path=/var/lib/docker 
+#        src=/pkg/docker 
+#        state=link 
+#        force=yes
 
 - systemd: state=restarted daemon_reload=yes name=docker
 
-- systemd: state=restarted daemon_reload=yes name=docker-tcp.socket
-
 - name: Enable and start the Docker engine
   service: name=docker  enabled=yes state=started
-
-- name: Enable and start the Docker socket
-  service: name=docker-tcp.socket  enabled=yes state=started
 
